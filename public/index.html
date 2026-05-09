@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>冰淇淋物價大盤指數觀測站</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        .form-section, .search-section {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        form label, .search-section label {
+            display: inline-block;
+            margin-right: 15px;
+        }
+        input {
+            padding: 5px;
+            margin-left: 5px;
+        }
+        button {
+            padding: 5px 15px;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0055aa;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .trend-up {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>冰淇淋物價大盤指數觀測站 🍦</h1>
+
+    <div class="form-section">
+        <h2>新增物價紀錄</h2>
+        <form id="insertForm">
+            <label>
+                日期:
+                <input type="date" id="dateInput" required>
+            </label>
+            <label>
+                商品名稱:
+                <input type="text" id="itemNameInput" placeholder="例：麥當勞蛋捲冰淇淋" required>
+            </label>
+            <label>
+                價格:
+                <input type="number" id="priceInput" min="0" required>
+            </label>
+            <button type="submit">新增</button>
+        </form>
+    </div>
+
+    <div class="search-section">
+        <h2>歷史物價紀錄</h2>
+        <label>
+            輸入商品關鍵字過濾:
+            <input type="text" id="searchInput" placeholder="搜尋...">
+        </label>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>日期 (Date)</th>
+                <th>商品名稱 (Item Name)</th>
+                <th>價格 (Price)</th>
+                <th>趨勢 (Trend)</th>
+            </tr>
+        </thead>
+        <tbody id="recordsTableBody">
+            <tr><td colspan="4">資料載入中...</td></tr>
+        </tbody>
+    </table>
+
+    <div class="summary-section" style="margin-top: 20px; background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeeba;">
+        <div id="summarySection"></div>
+    </div>
+
+    <script>
+        // 宣告全域變數存儲目前的歷史紀錄陣列
+        let allRecords = [];
+
+        // 畫面載入時取得資料
+        document.addEventListener('DOMContentLoaded', fetchRecords);
+
+        // 實作即時搜尋過濾功能
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const keyword = e.target.value.trim().toLowerCase();
+            const filteredData = allRecords.filter(record => 
+                record.item_name.toLowerCase().includes(keyword)
+            );
+            renderTable(filteredData);
+        });
+
+        // 打後端 API 拿資料
+        async function fetchRecords() {
+            try {
+                const response = await fetch('/api/records');
+                if (!response.ok) throw new Error('API fetch error');
+                allRecords = await response.json();
+                
+                // 初次載入，直接渲染全域資料
+                renderTable(allRecords);
+            } catch (err) {
+                console.error('取得資料失敗:', err);
+                document.getElementById('recordsTableBody').innerHTML = '<tr><td colspan="4">取得資料失敗，請確認伺服器是否啟動。</td></tr>';
+            }
+        }
+
+        // 以計算出趨勢的資料去渲染表格
+        function renderTable(dataToRender) {
+            const tbody = document.getElementById('recordsTableBody');
+            tbody.innerHTML = '';
+
+            if (!dataToRender || dataToRender.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">查無資料</td></tr>';
+                document.getElementById('summarySection').innerHTML = '';
+                return;
+            }
+
+            // 實作趨勢箭頭判斷邏輯
+            // 1. 將取得的資料按照日期由舊到新排序 (假設格式皆為 YYYY-MM-DD 可直接字串比對，或透過 Date 計算)
+            const sortedData = [...dataToRender].sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            // 2. 建立各商品追蹤用的 Map
+            const priceTracker = {};
+            const historyTracker = {}; // 追蹤最早與最新價格
+
+            // 3. 遍歷排序資料
+            sortedData.forEach(record => {
+                let trendHtml = '';
+                
+                // 紀錄每個商品的最早與最新價格
+                if (!historyTracker[record.item_name]) {
+                    historyTracker[record.item_name] = {
+                        oldestPrice: record.price,
+                        newestPrice: record.price
+                    };
+                } else {
+                    historyTracker[record.item_name].newestPrice = record.price;
+                }
+
+                // 若商品之前有價格紀錄，進行比較
+                if (priceTracker[record.item_name] !== undefined) {
+                    const previousPrice = priceTracker[record.item_name];
+                    if (record.price > previousPrice) {
+                        const diff = record.price - previousPrice;
+                        trendHtml = `<span class="trend-up">↑ 漲價 ${diff} 元</span>`;
+                    }
+                }
+                
+                // 更新該商品目前(這回合)最新的價格
+                priceTracker[record.item_name] = record.price;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${record.date}</td>
+                    <td>${record.item_name}</td>
+                    <td>${record.price}</td>
+                    <td>${trendHtml}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            renderSummary(historyTracker);
+        }
+
+        // 渲染整體歷史漲幅統計
+        function renderSummary(historyTracker) {
+            const summaryDiv = document.getElementById('summarySection');
+            let html = '<h2>歷史漲幅統計</h2><ul style="margin: 0; padding-left: 20px;">';
+            for (const item in historyTracker) {
+                const data = historyTracker[item];
+                const diff = data.newestPrice - data.oldestPrice;
+                if (diff > 0) {
+                    const percent = ((diff / data.oldestPrice) * 100).toFixed(2);
+                    html += `<li><strong>${item}</strong>：從歷史最早 ${data.oldestPrice} 元漲到最新 ${data.newestPrice} 元，共漲了 <strong>${diff} 元</strong> (<span class="trend-up">漲幅 ${percent}%</span>)</li>`;
+                } else if (diff < 0) {
+                    const percent = ((Math.abs(diff) / data.oldestPrice) * 100).toFixed(2);
+                    html += `<li><strong>${item}</strong>：從歷史最早 ${data.oldestPrice} 元跌到最新 ${data.newestPrice} 元，共跌了 <strong>${Math.abs(diff)} 元</strong> (跌幅 ${percent}%)</li>`;
+                } else {
+                    html += `<li><strong>${item}</strong>：最新價格 ${data.newestPrice} 元 (未有漲跌)</li>`;
+                }
+            }
+            html += '</ul>';
+            summaryDiv.innerHTML = html;
+        }
+
+        // 新增表單送出後，以 fetch 打向 POST /api/insert
+        document.getElementById('insertForm').addEventListener('submit', async (e) => {
+            e.preventDefault(); // 阻止重整網頁
+            
+            const date = document.getElementById('dateInput').value;
+            const item_name = document.getElementById('itemNameInput').value;
+            const price = document.getElementById('priceInput').value;
+
+            try {
+                const response = await fetch('/api/insert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ date, item_name, price: Number(price) })
+                });
+
+                const message = await response.text(); // 後端只回傳純文字
+                
+                if (response.ok) {
+                    alert(message); // 彈出新增成功
+                    document.getElementById('insertForm').reset(); // 清空表單
+                    fetchRecords(); // 重撈全部資料，並會自動呼叫 renderTable 重新計算趨勢
+                } else {
+                    alert(`新增失敗: ${message}`);
+                }
+            } catch (err) {
+                console.error('送出新增請求失敗:', err);
+                alert('伺服器連線錯誤！');
+            }
+        });
+    </script>
+</body>
+</html>
