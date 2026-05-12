@@ -45,6 +45,20 @@ app.post('/api/insert', (req, res) => {
     });
 });
 
+// 實作 DELETE /api/records/:id 路由
+app.delete('/api/records/:id', (req, res) => {
+    const id = req.params.id;
+    const sql = 'DELETE FROM price_records WHERE id = ?';
+
+    db.run(sql, id, function(err) {
+        if (err) {
+            console.error('刪除資料時發生錯誤:', err.message);
+            return res.status(500).send('刪除失敗');
+        }
+        res.status(200).send('刪除成功');
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`伺服器啟動於 http://localhost:${PORT}`);
 });

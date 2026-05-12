@@ -54,6 +54,17 @@
             color: red;
             font-weight: bold;
         }
+        .delete-btn {
+            background-color: #ff4d4f;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .delete-btn:hover {
+            background-color: #ff7875;
+        }
     </style>
 </head>
 <body>
@@ -94,10 +105,11 @@
                 <th>商品名稱 (Item Name)</th>
                 <th>價格 (Price)</th>
                 <th>趨勢 (Trend)</th>
+                <th>操作 (Action)</th>
             </tr>
         </thead>
         <tbody id="recordsTableBody">
-            <tr><td colspan="4">資料載入中...</td></tr>
+            <tr><td colspan="5">資料載入中...</td></tr>
         </tbody>
     </table>
 
@@ -132,7 +144,7 @@
                 renderTable(allRecords);
             } catch (err) {
                 console.error('取得資料失敗:', err);
-                document.getElementById('recordsTableBody').innerHTML = '<tr><td colspan="4">取得資料失敗，請確認伺服器是否啟動。</td></tr>';
+                document.getElementById('recordsTableBody').innerHTML = '<tr><td colspan="5">取得資料失敗，請確認伺服器是否啟動。</td></tr>';
             }
         }
 
@@ -142,7 +154,7 @@
             tbody.innerHTML = '';
 
             if (!dataToRender || dataToRender.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">查無資料</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">查無資料</td></tr>';
                 document.getElementById('summarySection').innerHTML = '';
                 return;
             }
@@ -187,6 +199,9 @@
                     <td>${record.item_name}</td>
                     <td>${record.price}</td>
                     <td>${trendHtml}</td>
+                    <td style="text-align: center;">
+                        <button class="delete-btn" onclick="deleteRecord(${record.id})">刪除</button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -246,6 +261,32 @@
                 alert('伺服器連線錯誤！');
             }
         });
+
+        // 刪除特定紀錄
+        async function deleteRecord(id) {
+            if (!confirm('確定要刪除這筆紀錄嗎？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/records/${id}`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    const resultMsg = await response.text();
+                    if (resultMsg === '刪除成功') {
+                        fetchRecords(); // 重新載入資料
+                        alert('已成功刪除該筆紀錄');
+                    }
+                } else {
+                    alert('刪除失敗 (伺服器錯誤)');
+                }
+            } catch (error) {
+                console.error('刪除請求發生異常:', error);
+                alert('網路連線異常，無法刪除');
+            }
+        }
     </script>
 </body>
 </html>
