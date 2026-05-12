@@ -65,6 +65,22 @@
         .delete-btn:hover {
             background-color: #ff7875;
         }
+        .scrape-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .scrape-btn:hover {
+            background-color: #218838;
+        }
+        .scrape-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -88,6 +104,8 @@
             </label>
             <button type="submit">新增</button>
         </form>
+        <hr style="margin: 15px 0; border: 0; border-top: 1px solid #ccc;">
+        <button id="scrapeBtn" class="scrape-btn">🤖 自動爬取麥當勞最新物價</button>
     </div>
 
     <div class="search-section">
@@ -287,6 +305,29 @@
                 alert('網路連線異常，無法刪除');
             }
         }
+
+        // 觸發自動爬蟲按鈕
+        document.getElementById('scrapeBtn').addEventListener('click', async (e) => {
+            const btn = e.target;
+            btn.disabled = true;
+            btn.innerText = '⏳ 爬取中...';
+
+            try {
+                const response = await fetch('/api/scrape-mcdonalds');
+                if (response.ok) {
+                    alert('爬取完成！');
+                    fetchRecords(); // 重新撈取資料並更新表格
+                } else {
+                    alert('爬取失敗 (伺服器錯誤)');
+                }
+            } catch (error) {
+                console.error('爬取請求異常:', error);
+                alert('網路連線異常，無法爬取');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '🤖 自動爬取麥當勞最新物價';
+            }
+        });
     </script>
 </body>
 </html>
